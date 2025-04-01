@@ -1,22 +1,21 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import requests
-import os
-from dotenv import load_dotenv
+from fastapi import FastAPI
+from funcoes import consultar_e_inserir_moedas
+from models import Session, Moeda
 
-load_dotenv()
-
-app = FastAPI()  
-
-#Chave e configuracao ExchangeRates
-API_KEY = os.getenv('f713e6ca651621072fb4f4b5f7f43e6a')
-BASE_URL = os.getenv('https://v6.exchangerate-api.com/v6')
-
-"""class CurrencyConversionRequest(BaseModel):
-    from_currency: str  # Ex: "USD"
-    to_currency: str    # Ex: "BRL"
-    amount: float       # Ex: 100.0"""
+app = FastAPI()
 
 @app.get("/")
 def home():
-    return {"message": "Olá, mundo!"}
+    session = Session()
+    try:
+        # Consulta a tabela moedas
+        moedas = session.query(Moeda).all()
+        if not moedas:
+            # Se a tabela estiver vazia, preenche com dados da API
+            result = consultar_e_inserir_moedas()
+            return result
+
+        # Retorna os dados da tabela
+        return {"moedas": [{"id": moeda.id, "nome": moeda.nome, "cod": moeda.cod} for moeda in moedas]}
+    finally:
+        session.close()
