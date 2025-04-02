@@ -4,8 +4,8 @@ from models import Session, Moeda
 
 app = FastAPI()
 
-@app.get("/")
-def home():
+@app.get("/listar-moedas/")
+def listar_moedas():
     session = Session()
     try:
         # Consulta a tabela moedas
@@ -16,6 +16,6 @@ def home():
             return result
 
         # Retorna os dados da tabela
-        return {"moedas": [{"id": moeda.id, "nome": moeda.nome, "cod": moeda.cod} for moeda in moedas]}
+        return {"moedas": [{"nome": moeda.nome, "cod": moeda.cod} for moeda in moedas]}
     finally:
         session.close()
