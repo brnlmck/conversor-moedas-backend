@@ -36,7 +36,7 @@ def inserir_dados(nome, cod):
 def consultar_e_inserir_moedas():
     try:
         # Consulta a API
-        api_url = os.getenv("API_URL")
+        api_url = "https://api.exchangeratesapi.io/v1/symbols?access_key=" + os.getenv("API_KEY")
         response = requests.get(api_url)
         response.raise_for_status()
         data = response.json()
@@ -54,3 +54,4 @@ def consultar_e_inserir_moedas():
         return {"message": f"Erro ao consultar dados via API: {e}"}
     
     return {"message": "Dados inseridos com sucesso!"}
+    
