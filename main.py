@@ -4,6 +4,7 @@ import requests
 from funcoes import consultar_e_inserir_moedas
 from models import Session, Moeda
 from fastapi import HTTPException
+from datetime import datetime, timedelta
 
 app = FastAPI()
 
@@ -13,10 +14,20 @@ def listar_moedas():
     try:
         # Consulta a tabela moedas
         moedas = session.query(Moeda).all()
+
+        # Consulta a tabela ultimaatualizacao
+        ultima_atualizacao = session.execute("SELECT datahora FROM ultimaatualizacao").fetchone()
+
+        if not ultima_atualizacao or (datetime.now() - ultima_atualizacao[0] > timedelta(days=365)):
+            # Se não houver registro ou se passou mais de um ano, atualiza as moedas
+            consultar_e_inserir_moedas()
+            # Atualiza a data de última atualização
+            session.execute("UPDATE ultimaatualizacao SET datahora = :datahora", {"datahora": datetime.now()})
+            session.commit()
+
         if not moedas:
             # Se a tabela estiver vazia, preenche com dados da API
-            result = consultar_e_inserir_moedas()
-            #return result
+            consultar_e_inserir_moedas()
             moedas = session.query(Moeda).all()
 
         # Retorna os dados da tabela
@@ -25,11 +36,9 @@ def listar_moedas():
         session.close()
 
 @app.get("/converter")
-def converter(base: dict):
+def converter(quantia_base: float, moeda_base: str, moedas_destino: str):
     try:
-        quantia_base = base.get("quantia_base")
-        moeda_base = base.get("moeda_base")
-        moedas_destino = base.get("moedas_destino")
+        moedas_destino = [moeda.strip() for moeda in moedas_destino.split(",")]  # Converte a string em uma lista de moedas
 
         # Valida os dados de entrada
         if not quantia_base or not moeda_base or not moedas_destino:
@@ -68,10 +77,15 @@ def converter(base: dict):
                 )
             # Converte de euro para a moeda de destino
             quantia_convertida = quantia_em_euros * taxa_para_destino
-            resultados.append({"moeda": moeda_destino, "quantia_convertida": quantia_convertida})
+            resultados.append({"moedaPara": moeda_destino, "valorConvertido": quantia_convertida, "taxaCambio": taxa_para_destino, "codigoMoeda": moeda_destino})
+
+            #todo: adicionar a data de atualização da taxa de câmbio
+            #todo: calcular a taxa de câmbio em relação a moeda base
+            #todo: fazer busca do nome da moeda base na tabela de moedas
+            #todo: formatar o valor convertido para duas casas decimais
 
         # Retorna os resultados
-        return {"moeda_base": moeda_base, "quantia_base": quantia_base, "resultados": resultados}
+        return {"data": resultados}
 
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Erro ao consultar a API: {e}")
