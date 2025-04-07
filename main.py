@@ -18,12 +18,14 @@ def listar_moedas():
         # Consulta a tabela ultimaatualizacao
         ultima_atualizacao = session.execute("SELECT datahora FROM ultimaatualizacao").fetchone()
 
-        if not ultima_atualizacao or (datetime.now() - ultima_atualizacao[0] > timedelta(days=365)):
-            # Se não houver registro ou se passou mais de um ano, atualiza as moedas
-            consultar_e_inserir_moedas()
-            # Atualiza a data de última atualização
-            session.execute("UPDATE ultimaatualizacao SET datahora = :datahora", {"datahora": datetime.now()})
-            session.commit()
+        # (pendente) --LÓGICA DE ATUALIZAÇÃO DAS MOEDAS--
+
+        # if not ultima_atualizacao or (datetime.now() - ultima_atualizacao[0] > timedelta(days=365)):
+        #     # Se não houver registro ou se passou mais de um ano, atualiza as moedas
+        #     consultar_e_inserir_moedas()
+        #     # Atualiza a data de última atualização
+        #     session.execute("UPDATE ultimaatualizacao SET datahora = :datahora", {"datahora": datetime.now()})
+        #     session.commit()
 
         if not moedas:
             # Se a tabela estiver vazia, preenche com dados da API
@@ -54,6 +56,11 @@ def converter(quantia_base: float, moeda_base: str, moedas_destino: str):
         rates = data.get("rates", {})
         if not rates:
             return {"message": "Moedas não encontradas na response."}
+        
+        # Data e hora
+        datahora = data.get("timestamp")
+        if not datahora:
+            raise HTTPException(status_code=500, detail="Data e hora não encontradas na response.")
 
         # Checa se a moeda base está na resposta
         taxa_base_para_euro = rates.get(moeda_base)
@@ -62,9 +69,6 @@ def converter(quantia_base: float, moeda_base: str, moedas_destino: str):
                 status_code=404,
                 detail=f"Taxa de conversão não encontrada para a moeda base {moeda_base}"
             )
-
-        # Converte de moeda base para euro
-        quantia_em_euros = quantia_base / taxa_base_para_euro
 
         # Faz a conversão para as moedas de destino
         resultados = []
@@ -75,17 +79,20 @@ def converter(quantia_base: float, moeda_base: str, moedas_destino: str):
                     status_code=404,
                     detail=f"Taxa de conversão não encontrada para {moeda_destino}"
                 )
+            taxa_relativa =  taxa_para_destino / taxa_base_para_euro
             # Converte de euro para a moeda de destino
-            quantia_convertida = quantia_em_euros * taxa_para_destino
-            resultados.append({"moedaPara": moeda_destino, "valorConvertido": quantia_convertida, "taxaCambio": taxa_para_destino, "codigoMoeda": moeda_destino})
+            quantia_convertida = quantia_base * taxa_relativa
+            resultados.append({
+                "moedaPara": moeda_destino,
+                "valorConvertido": round(quantia_convertida, 2),
+                "taxaCambio": taxa_relativa,
+                "codigoMoeda": moeda_destino
+            })
 
-            #todo: adicionar a data de atualização da taxa de câmbio
-            #todo: calcular a taxa de câmbio em relação a moeda base
             #todo: fazer busca do nome da moeda base na tabela de moedas
-            #todo: formatar o valor convertido para duas casas decimais
 
         # Retorna os resultados
-        return {"data": resultados}
+        return {"timestamp": datetime.fromtimestamp(datahora).strftime('%d-%m-%Y %H:%M:%S'), "data": resultados}
 
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Erro ao consultar a API: {e}")
