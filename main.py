@@ -4,9 +4,23 @@ import requests
 from funcoes import consultar_e_inserir_moedas
 from models import Session, Moeda
 from fastapi import HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 @app.get("/listar-moedas")
 def listar_moedas():
@@ -14,19 +28,6 @@ def listar_moedas():
     try:
         # Consulta a tabela moedas
         moedas = session.query(Moeda).all()
-
-        # Consulta a tabela ultimaatualizacao
-        ultima_atualizacao = session.execute("SELECT datahora FROM ultimaatualizacao").fetchone()
-
-        # (pendente) --LÓGICA DE ATUALIZAÇÃO DAS MOEDAS--
-
-        # if not ultima_atualizacao or (datetime.now() - ultima_atualizacao[0] > timedelta(days=365)):
-        #     # Se não houver registro ou se passou mais de um ano, atualiza as moedas
-        #     consultar_e_inserir_moedas()
-        #     # Atualiza a data de última atualização
-        #     session.execute("UPDATE ultimaatualizacao SET datahora = :datahora", {"datahora": datetime.now()})
-        #     session.commit()
-
         if not moedas:
             # Se a tabela estiver vazia, preenche com dados da API
             consultar_e_inserir_moedas()
@@ -56,7 +57,7 @@ def converter(quantia_base: float, moeda_base: str, moedas_destino: str):
         rates = data.get("rates", {})
         if not rates:
             return {"message": "Moedas não encontradas na response."}
-        
+
         # Data e hora
         datahora = data.get("timestamp")
         if not datahora:
