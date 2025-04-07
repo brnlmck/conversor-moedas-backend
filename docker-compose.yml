@@ -1,0 +1,48 @@
+# docker-compose.yml
+version: "3.8"
+
+services:
+  # Serviço da sua aplicação FastAPI
+  app:
+    build: .
+    container_name: fastapi_app
+    env_file:
+      - .env # Carrega DATABASE_URL e API_KEY
+    ports:
+      - "8000:8000"
+    depends_on:
+      db: # Espera o serviço 'db' estar pronto (condição básica)
+        condition: service_healthy # Espera o MySQL estar realmente pronto
+    volumes:
+      - .:/app # (Opcional, para desenvolvimento)
+
+  # Serviço do Banco de Dados MySQL
+  db:
+    image: mysql:8.0 # Usa uma imagem oficial do MySQL (versão 8.0 recomendada)
+    container_name: mysql_db
+    env_file:
+      - .env # Carrega MYSQL_ROOT_PASSWORD, MYSQL_DATABASE, MYSQL_USER, MYSQL_PASSWORD
+    volumes:
+      - mysql_data:/var/lib/mysql # Persiste os dados do banco MySQL
+    ports:
+      - "3306:3306" # (Opcional) Expõe a porta do MySQL no host
+    environment:
+      # Garante que o MySQL use um plugin de autenticação compatível
+      MYSQL_AUTHENTICATION_PLUGIN: mysql_native_password
+    healthcheck: # Verifica se o MySQL está pronto para aceitar conexões
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u$$MYSQL_USER",
+          "-p$$MYSQL_PASSWORD",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_data: # Define um volume nomeado para persistir os dados do BD
