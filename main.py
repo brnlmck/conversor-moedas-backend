@@ -6,6 +6,8 @@ from models import Session, Moeda
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
+from models import Base
+from sqlalchemy import inspect
 
 app = FastAPI()
 
@@ -26,15 +28,24 @@ app.add_middleware(
 def listar_moedas():
     session = Session()
     try:
+        # Verifica se a tabela 'moedas' existe e cria se não existir
+        inspector = inspect(session.bind)
+        if not inspector.has_table("moedas"):
+            Base.metadata.create_all(session.bind)
+
         # Consulta a tabela moedas
         moedas = session.query(Moeda).all()
+
+        # Se a tabela estiver vazia, preenche com dados da API
         if not moedas:
-            # Se a tabela estiver vazia, preenche com dados da API
             consultar_e_inserir_moedas()
+            session.commit()
             moedas = session.query(Moeda).all()
 
         # Retorna os dados da tabela
         return {"moedas": [{"nome": moeda.nome, "cod": moeda.cod} for moeda in moedas]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar a tabela 'moedas': {e}")
     finally:
         session.close()
 
