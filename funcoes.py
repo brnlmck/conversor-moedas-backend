@@ -29,6 +29,7 @@ def inserir_dados(nome, cod):
     except Exception as e:
         session.rollback()
         print(f"Erro: {e}")
+        raise e
     finally:
         session.close()
 
